@@ -14,4 +14,8 @@ Code for computing the Cosmic Infrared Background Powerspectrum coupled with Lin
 - Under HaloModel, the Halo Mass corrected model accuate to small scales within the one halo term according to Maniyar 2020. Also incorporates the subhalo mass function according to Tinker 2018
 
 ### Data files
-- SED.fits, redshift dependent Spectral Energy Distribution for the luminous star forming galaxy accross the Planck survey frequencies \[100, 143, 217, 353, 545, 867, 3000]
+- SED.fits, redshift dependent Spectral Energy Distribution for the luminous star forming galaxy accross the Planck survey frequencies \[100, 143, 217, 353, 545, 867, 3000] GHz
+
+### References:
+- Maniyar, A. & Béthermin, M. & Lagache, G. 2018, A&A, 614, 1432-0746
+- Maniyar, A. & Béthermin, M. & Lagache, G. 2021, A&A, 645, 1432-0746
