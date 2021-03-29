@@ -32,10 +32,10 @@ class LinearModel():
         # SED in Jy L_sun
         hdulist = fits.open("../SED.fits")
         self.redshifts = hdulist[1].data
-        self.SED = hdulist[0].data[:-1] # Don't include 3000GHz
+        self.SED = hdulist[0].data # Don't include 3000GHz
         hdulist.close()
 
-        self.freqs = np.array([100, 143, 217, 353, 545, 857], dtype="float64")
+        self.freqs = np.array([100, 143, 217, 353, 545, 857, 3000], dtype="float64")
     
     # Star formation density function
     def rho_SFR(self, z):
@@ -50,12 +50,16 @@ class LinearModel():
         res = self.rho_SFR(z) * (1+z) * self.SED[np.where(self.freqs==nu)][0] * self.chi(z)**2 / self.K
         return res
 
-    def plot_emissitivity(self, freqs=None):
+    def plot_emissitivity(self, freqs=None, normal=False):
         if freqs == None:
             freqs = self.freqs
         # Plot the emissitivity functions
         for f in freqs:
-            plt.plot(self.redshifts, self.j(f, self.redshifts), label="{} GHz".format(f))
+            j_func = self.j(f, self.redshifts)
+            if normal:
+                plt.plot(self.redshifts, j_func/np.trapz(y=j_func, x=self.redshifts), label="{} GHz".format(f))
+            else:
+                plt.plot(self.redshifts, self.j(f, self.redshifts), label="{} GHz".format(f))
         plt.yscale("log")
         plt.xlabel("Redshift z")
         plt.ylabel(r"Emissitivity $[\rm Jy L_{\odot}/\rm Mpc]$")
