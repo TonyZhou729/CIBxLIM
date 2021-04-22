@@ -5,7 +5,8 @@ import scipy.constants as const
 from astropy.cosmology import Planck15 as cosmo
 import time
 from astropy.io import fits
-
+from scipy import interpolate
+import astropy.units as u
 
 class LinearModel():
     """
@@ -17,26 +18,26 @@ class LinearModel():
     """
 
     def __init__(self):
-
         # Comoving distance shorthand in Mpc
         self.chi = lambda z : np.array(cosmo.comoving_distance(z))
         # Kennicutt constant in M_sun/yr
         self.K = 1e-10
-
+        
         # Fitting parameters:
         self.alpha = 0.007
         self.beta = 3.590
         self.gamma = 2.453
         self.delta = 6.578
 
-        # SED in Jy L_sun
-        hdulist = fits.open("../SED.fits")
-        self.redshifts = hdulist[1].data
-        self.SED = hdulist[0].data # Don't include 3000GHz
-        hdulist.close()
+        self.SED = np.loadtxt("../SEDdata/SEDtable.txt")
+        self.redshifts = np.loadtxt("../SEDdata/SEDredshifts.txt")
+        self.wavelengths = np.loadtxt("../SEDdata/SEDwavelengths.txt")
+        
+        self.interp_SED = interpolate.interp2d(self.wavelengths, 
+                                               self.redshifts, 
+                                               self.SED,
+                                               kind="linear")
 
-        self.freqs = np.array([100, 143, 217, 353, 545, 857, 3000], dtype="float64")
-    
     # Star formation density function
     def rho_SFR(self, z):
         # In units of M_sun/yr/Mpc^3
@@ -45,25 +46,67 @@ class LinearModel():
         return self.alpha * numerator/denominator
 
     # Emissitivity
-    def j(self, nu, z):
-        assert np.any(np.isin(self.freqs, nu)), "Frequency must be one of [100, 143, 217, 353, 545, 857] GHz"
-        res = self.rho_SFR(z) * (1+z) * self.SED[np.where(self.freqs==nu)][0] * self.chi(z)**2 / self.K
+    def j(self, l, z):
+        res = self.rho_SFR(z) * (1+z) * self.interp_SED(l, z)[:, 0] * self.chi(z)**2 / self.K
         return res
 
-    def plot_emissitivity(self, freqs=None, normal=False):
-        if freqs == None:
-            freqs = self.freqs
-        # Plot the emissitivity functions
-        for f in freqs:
-            j_func = self.j(f, self.redshifts)
+    def CIB_model(self, l, z):
+        # Derivative of CIB intensity w.r.t. redshift, input into the powerspectrum calculation.
+        c = const.c/1000 # Speed of light in units km/s
+        a = 1/(1+z)
+        res = c/np.array(cosmo.H(z)) * a * self.j(l, z)
+        return res
+        
+
+    def plot_emissitivity(self, z, freqs=None, wavelengths=None, freq_unit=u.GHz, wave_unit = u.um, normal=False):
+        # Plot the emissitivity j for given frequncy or array of frequencies.
+        # Default unit is GHz for frequency and micrometer for wavelength. 
+        if freqs is None:
+            assert wavelengths is not None, "Must input either frequency or wavelengths"
+            wavelengths *= wave_unit
+            wavelengths = wavelengths.to(u.um)
+        else:
+            freqs *= freq_unit
+            freqs = freqs.to(u.Hz)
+            c = const.c * u.m * u.Hz
+            wavelengths = c/freqs
+            wavelengths = wavelengths.to(u.um)
+        
+        wavelengths = np.array(wavelengths)
+        for l in wavelengths:
+            j_func = self.j(l, z)
             if normal:
-                plt.plot(self.redshifts, j_func/np.trapz(y=j_func, x=self.redshifts), label="{} GHz".format(f))
+                plt.plot(self.redshifts, j_func/np.trapz(y=j_func, x=z), label="{:.3f} um".format(l))
             else:
-                plt.plot(self.redshifts, self.j(f, self.redshifts), label="{} GHz".format(f))
+                plt.plot(self.redshifts, j_func, label="{:.3f} um".format(l))
         plt.yscale("log")
         plt.xlabel("Redshift z")
         plt.ylabel(r"Emissitivity $[\rm Jy L_{\odot}/\rm Mpc]$")
         plt.legend()
         plt.show()
 
-
+    def plot_CIB_model(self, z, freqs=None, wavelengths=None, freq_unit=u.GHz, wave_unit = u.um, normal=True):
+        # Plot the emissitivity j for given frequncy or array of frequencies.
+        # Default unit is GHz for frequency and micrometer for wavelength. 
+        if freqs is None:
+            assert wavelengths is not None, "Must input either frequency or wavelengths"
+            wavelengths *= wave_unit
+            wavelengths = wavelengths.to(u.um)
+        else:
+            freqs *= freq_unit
+            freqs = freqs.to(u.Hz)
+            c = const.c * u.m * u.Hz
+            wavelengths = c/freqs
+            wavelengths = wavelengths.to(u.um)
+        
+        wavelengths = np.array(wavelengths)
+        for l in wavelengths:
+            j_func = self.CIB_model(l, z)
+            if normal:
+                plt.plot(self.redshifts, j_func/np.trapz(y=j_func, x=z), label="{:.3f} um".format(l))
+            else:
+                plt.plot(self.redshifts, j_func, label="{:.3f} um".format(l))
+        plt.xlabel("Redshift z")
+        plt.ylabel(r"$ dI_{\lambda}/dz$")
+        plt.legend()
+        plt.show()
