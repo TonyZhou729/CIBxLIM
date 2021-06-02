@@ -1,10 +1,10 @@
-import emis
+from LinearModel import LinearModel
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.constants as const
 import astropy.units as u
 
-LinearModel = emis.LinearModel()
+LinearModel = LinearModel()
 
 c = const.c * u.m/u.s
 freqs = np.array([100, 143, 217, 353, 545, 857, 3000, 127.5, 392.4, 188.8], dtype="float64")

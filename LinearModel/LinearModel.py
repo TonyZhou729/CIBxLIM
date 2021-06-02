@@ -29,14 +29,19 @@ class LinearModel():
         self.gamma = 2.453
         self.delta = 6.578
 
-        self.SED = np.loadtxt("../SEDdata/SEDtable.txt")
-        self.redshifts = np.loadtxt("../SEDdata/SEDredshifts.txt")
-        self.wavelengths = np.loadtxt("../SEDdata/SEDwavelengths.txt")
-        
+        path = "/mount/citadel1/zz1994/codes/CIBxLIM/SEDdata"
+        self.SED = np.loadtxt("{}/SEDtable.txt".format(path))
+        self.redshifts = np.loadtxt("{}/SEDredshifts.txt".format(path))
+        self.wavelengths = np.loadtxt("{}/SEDwavelengths.txt".format(path))
+        self.chi_peaks = np.loadtxt("{}/chi_peaks.txt".format(path))
+
         self.interp_SED = interpolate.interp2d(self.wavelengths, 
                                                self.redshifts, 
                                                self.SED,
                                                kind="linear")
+        self.interp_chi_peaks = interpolate.interp1d(self.wavelengths,
+                                                     self.chi_peaks,
+                                                     kind="linear")
 
     # Star formation density function
     def rho_SFR(self, z):
@@ -47,7 +52,7 @@ class LinearModel():
 
     # Emissitivity
     def j(self, l, z):
-        res = self.rho_SFR(z) * (1+z) * self.interp_SED(l, z)[:, 0] * self.chi(z)**2 / self.K
+        res = self.rho_SFR(z) * (1+z) * self.interp_SED(l, z).T * self.chi(z)**2 / self.K
         return res
 
     def CIB_model(self, l, z):
