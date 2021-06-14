@@ -6,6 +6,7 @@ from LinearModel.LinearModel import LinearModel
 import camb
 from camb import get_matter_power_interpolator as mpi
 import vegas
+from scipy import interpolate
 
 """
 Unit System:
@@ -34,8 +35,11 @@ class CIBxLIM():
                  exp="EXCLAIM",
                  target_line="CII",
                  target_line_rest_wavelength=None,
-                 want_function_of_K=False):
-
+                 want_function_of_K=False,
+                 verbose=True):
+        
+        self.verbose = verbose # Operation messages
+        
         if exp == "EXCLAIM":
             self.z_X_min=2.5
             self.z_X_max=3.5
@@ -44,12 +48,16 @@ class CIBxLIM():
 
         self.l_X = 158 # Rest wavelength of CII, in microns.
         self.ell = 0
+        self.kp = 0
         self.kpp = 0
 
         # Import CIB model. Default use Linear Model from Maniyar 2018
         self.CIBmodel = LinearModel() 
         self.chi_p = lambda l : self.CIBmodel.interp_chi_peaks(l)
-
+        self.z_min = self.CIBmodel.redshifts.min()
+        self.z_max = self.CIBmodel.redshifts.max()
+        
+        """
         # Perform CAMB parameter setup according to astropy cosmology.
         # Setup Nonlinear matter power spectrum interpolator for subsequent calculations. 
         self.camb_setup()
@@ -58,7 +66,15 @@ class CIBxLIM():
                  zmax=11, 
                  hubble_units=False, 
                  k_hunit=False) # Here I do not use Hubble units for input or output.
-        
+        """ 
+        # Tuple random points P(z, k) interpolator.
+        print("Loading and creating P(z, k) interpolator...")
+        PK_grid = np.loadtxt("PKdata/k0-40_3500.txt")
+        k = np.linspace(0, 1, 3500)
+        z = np.linspace(self.z_min, self.z_max, 3500)
+        self.PK_interpolator = interpolate.RectBivariateSpline(z, k, PK_grid)
+        print("P(z, k) interpolator successfully created.")
+
         # Effective bias from the linear model:
         b0 = 0.83
         b1 = 0.742
@@ -74,90 +90,10 @@ class CIBxLIM():
         self.CAMBparams.set_cosmology(H0=H0, omch2=omch2, ombh2=ombh2, Alens=1.2)
         print("CAMB setup successful")
 
-    def compute_powerspectrum(self, k_para_1, k_para_2, ell, func_of_k = False):  
-        k_para = np.linspace(0, 1, 100) / u.Mpc
-        func = lambda k_para : self.V_tilde_Re(k_para, k_para_1, ell)**2 + self.V_tilde_Im(k_para, k_para_2, ell)**2
-        if func_of_k:
-            # Is function of k_parallel'
-            func_arr = np.zeros((k_para.size, k_para_1.size)) * u.Jy**2 * u.Mpc**5
-        else:
-            # Is function of ell at some value k_parallel'
-            func_arr = np.zeros((k_para.size, ell.size)) * u.Jy**2 * u.Mpc**5
-        for i, k in enumerate(k_para):
-            print(i)
-            func_arr[i] = func(k)
-        
-        # Normalizing distances
-        L_prime = cosmo.comoving_distance(self.z_X_max) - cosmo.comoving_distance(self.z_X_min)
-        z_avg = np.average(self.CIBmodel.redshifts)
-        chi = cosmo.comoving_distance(self.z_X_max)
-   
-        return np.trapz(func_arr, k_para, axis=0)/2/np.pi/L_prime/(chi**2)
-        
-    """
-    Real part of one V_tilde term. For full definition refer to Jupyter Notebook.
-    2D integral over redshift and line wavelength, integrated numerically using Monte Carlo. 
-    
-    Params:
-    ------
-    (float) k_para_prime : Wavenumber, C_ell covariant matrix index.
-    (float) k_para : CIB wavenumber integration variable.
-    (float) ell : Angular wavenumber
-
-    Return:
-    ------
-    Monte carlo integrated result of the assembled 2D function of wavelength and CIB redshift. 
-    """
-    def V_tilde_Re(self, k_para, k_para_prime, ell):
-        func = lambda l, z : np.cos(self.sinu_arg(k_para_prime, k_para, l, z)) * self.F(k_para, ell, z) * self.G(l, z)
-        return self.monte_carlo_integrator(func, ell, k_para_prime)
-
-    """
-    Imaginary part of one V_tilde term. All forms identical to V_tilde_Re but the cosine term replaced
-    by a sine term due to the Euler identity expansion. Parameters and return value analogous to that 
-    of V_tilde_Re.
-    """
-    def V_tilde_Im(self, k_para, k_para_prime, ell): 
-        func = lambda l, z : np.sin(self.sinu_arg(k_para_prime, k_para, l, z)) * self.F(k_para, ell, z) * self.G(l, z)
-        return self.monte_carlo_integrator(func, ell, k_para_prime)
-
-    """
-    Abbreviated function, product of the effective bias b_eff(z) and the matter power spectrum from CAMB.
-
-    Params:
-    ------
-    (float) k_{para} : CIB wavenumber, integration variable in Cl
-    (float) ell : Angular wavenumber
-    (float) z : CIB redshift
-
-    Return:
-    ------
-    b_eff(z) x sqrt(P(k_{para}, z))
-    """
-    def F(self, k_para, ell, z):
-        chi = np.array(cosmo.comoving_distance(z)) # Comoving distance
-        k = np.sqrt(k_para**2 + ell**2/chi**2) # k = sqrt(kpara^2 + kperp^2)), made dimensionless
-        return self.b_eff(z) * np.sqrt(self.PK.P(z, k)).T # Units Mpc^(3/2)
-
-    def G(self, l, z):
-        c = const.c / 1000 # Speed of light in units km/s
-        coef = c / self.l_X / np.array(cosmo.H(self.z_X(l))) * (u.Mpc.to(u.um)) # Units Mpc/um
-        CIB = self.CIBmodel.CIB_model(l, z) # Units Jy 
-        return coef * CIB / self.chi_p(l) # Units Jy/um, chi_p cancels out the Mpc. 
-
     def z_X(self, l):
         # Redshift from which a line with rest wavelength l_X is received at l
         return l/self.l_X - 1
         
-    def sinu_arg(self, k_para_prime, k_para, l, z):
-        # Shorthand for k_prime x_prime(l) - kx(z)
-        
-        # Physical distances, both in Mpc
-        x_para_prime = cosmo.comoving_distance(self.z_X(l)) # Line redshift distance
-        x_para = cosmo.comoving_distance(z) # CIB redshift distance
-       
-        return (k_para_prime*x_para_prime - k_para*x_para).to(u.rad, equivalencies=u.dimensionless_angles())
-
     def sinu_arg_5D(self, kpp, kp, l1, z1, l2, z2):
         x1pp = np.array(cosmo.comoving_distance(self.z_X(l1)))
         x2pp = np.array(cosmo.comoving_distance(self.z_X(l2)))
@@ -173,133 +109,86 @@ class CIBxLIM():
         x_para = np.array(cosmo.comoving_distance(z)) # CIB redshift distance
        
         return (k_para_prime*x_para_prime - k_para*x_para)
-    
-    def monte_carlo_integrator(self, func, ell, k_para_prime):
-        # Integrate the input function in 2D over redshift and wavelength.
-        N = 100 # Number of random samples
-        #res = np.zeros(ell.size, dtype="float64")
-        res = np.zeros(k_para_prime.size, dtype="float64") * u.Jy * u.Mpc**(3/2)
 
-        # Wavelength bounds computed using z_X = l/l_X - 1
-        l_X = self.l_X
-        l_min = (self.z_X_min+1)*l_X
-        l_max = (self.z_X_max+1)*l_X
+##### Simpsons 1D + 2 x (Vegas 2D)
 
-        # CIB redshift bounds
-        z_min = self.CIBmodel.redshifts.min()
-        z_max = self.CIBmodel.redshifts.max()
-
-        for i in range(N):
-            # Generate random pair and sum func. 
-            rand_l = (l_max - l_min) * np.random.random_sample() + l_min
-            rand_z = (z_max - z_min) * np.random.random_sample() + z_min
-            res += func(rand_l, rand_z)
-        res *= (z_max-z_min) * (l_max-l_min).to(u.Mpc)/N
-        return res
-
-
-##### Vegas 5D #####
-    """
-    x : 5D list, contains integration variables [v, u1, z1, u2, z2]
-    """
-    def integrand(self, x):
-        l_X = self.l_X
-        ret = np.cos(self.sinu_arg_5D(self.kpp, x[0]*self.kpp, x[1]*l_X, x[2], x[3]*l_X, x[4]))
-        ret *= self.F(x[0]*self.kpp, self.ell, x[2]) * self.G(x[1]*l_X, x[2])
-        ret *= self.F(x[0]*self.kpp, self.ell, x[4]) * self.G(x[3]*l_X, x[4])
-        return ret
-    
-    """
-    x : 5D list, contains integration variables [v, u1, z1, u2, z2]
-    """
+    # x contains integration variables [u, z], where u=l/l_X
     @vegas.batchintegrand
-    def batch_integrand(self, x):
-        l_X = self.l_X
-        for i in range(5):
-            print(x[:, i].shape)
-        ret = np.sin(self.sinu_arg_5D(self.kpp, x[:, 0]*self.kpp, x[:, 1]*l_X, x[:, 2], x[:, 3]*l_X, x[:, 4]))[0]
-        ret *= self.F(x[:, 0]*self.kpp, self.ell, x[:, 2]) * self.G(x[:, 1]*l_X, x[:, 2])[0]
-        ret *= self.F(x[:, 0]*self.kpp, self.ell, x[:, 4]) * self.G(x[:, 3]*l_X, x[:, 4])[0]
+    def integrand_Re(self, x):
+        ret = np.cos(self.exp_arg(self.kpp, self.kp, self.l_X*x[:, 0], x[:, 1]))
+        #ret *= self.F(self.kp, self.ell, x[:, 1])
+        #ret *= self.G(self.l_X*x[:, 0], x[:, 1])
         return ret
 
-    """
-    Compute the powerspectrum using above integral.
-    """
-    def Vegas5D(self, kpp, ell):
-        self.kpp = kpp
-        self.ell = ell
- 
+    @vegas.batchintegrand
+    def integrand_Im(self, x):
+        ret = np.sin(self.sinu_arg(self.kp, x[:, 0], x[:, 1]))
+        ret *= self.F_full(self.kpp, self.ell, self.kp, x[:, 0], x[:, 1])
+        return ret
+
+    def integrand_Im_simpsons(self, z, u):
+        ret = self.F_full(self.kpp, self.ell, self.kp, z, u)
+        ret *= np.sin(self.sinu_arg(self.kp, z, u))
+        return ret
+
+    def create_vegas_integrator(self): 
         u_min = self.z_X_min+1
         u_max = self.z_X_max+1
 
         z_min = self.CIBmodel.redshifts.min()
         z_max = self.CIBmodel.redshifts.max()
 
-        v_min = 0
-        v_max = 1/self.kpp
-     
-        L = np.array(cosmo.comoving_distance(self.z_X_max) - cosmo.comoving_distance(self.z_X_min))
+        return vegas.Integrator([[z_min, z_max], [u_min, u_max]])
 
-        integ = vegas.Integrator([[v_min, v_max], [u_min, u_max], [z_min, z_max], [u_min, u_max], [z_min, z_max]])
-        ret = integ(self.integrand, nitn=10, neval=10000)
-        ret *= self.kpp * self.l_X**2 / (2*np.pi) / L
+    def compute_Cl(self, kpp, ell, neval, nitn=10):
+        self.kp=0.3 # Test k_parallel at 0.3 1/Mpc
+        self.kpp = kpp
+        self.ell = ell
+
+        integ = self.create_vegas_integrator()
+
+        #res_Re = integ(self.integrand_Re, nitn=nitn, neval=neval)
+        res_Im = integ(self.integrand_Im, nitn=nitn, neval=neval)
+
+        #print(res_Re.summary())
+        print(res_Im.summary())
+
+##### "The straight forward" #####
+    def F_full(self, kpp, ell, kp, z, u):
+        ret = (const.c / 1000) / self.chi_p(u*self.l_X) / np.array(cosmo.H(self.z_X(u*self.l_X))) # Dimensionless factor, comes from xpp ---> l.
+        ret *= self.b_eff(z) # bias
+        
+        # Calculate matter power spectrum component.
+        k = np.sqrt(kp**2 + ell**2/np.array(cosmo.comoving_distance(z)))
+        ret *= np.sqrt(self.PK_interpolator(z, k, grid=False))
+
+        ret *= self.CIBmodel.CIB_model(u*self.l_X, z) # The CIB intensity in Jy.
+        
         return ret
 
+    def sinu_arg(self, kp, z, u):
+        xpp = np.array(cosmo.comoving_distance(self.z_X(u*self.l_X)))
+        xp = np.array(cosmo.comoving_distance(z))
+        return (self.kpp*xpp - kp*xp)
 
-class CIBxLIM_V2():
-    
-    def __init__(self):
-        self.z_X_min = 2.5
-        self.z_X_max = 3.5
-        self.l_X = 158 # Rest wavelength of CII in microns.
+    @vegas.batchintegrand
+    def integrand_full(self, x):
+        # x is [kp, z1, u1, z2, u2]
+        ret = self.F_full(self.kpp, self.ell, x[:, 0], x[:, 1], x[:, 2])
+        ret *= self.F_full(self.kpp, self.ell, x[:, 0], x[:, 3], x[:, 4])
+        #ret *= np.exp(1j * self.sinu_arg(x[:, 0], x[:, 1], x[:, 2]))
+        #ret *= np.exp(-1j * self.sinu_arg(x[:, 0], x[:, 3], x[:, 4]))
+        ret *= np.sin(self.sinu_arg(x[:, 0], x[:, 1], x[:, 2]) - self.sinu_arg(x[:, 0], x[:, 3], x[:, 4]))
+        return ret
 
-         # Import CIB model. Default use Linear Model from Maniyar 2018
-        self.CIBmodel = LinearModel() 
-        self.chi_p = lambda l : self.CIBmodel.interp_chi_peaks(l)
+    def integrand_full_nonbatch(self, kp, z1, u1, z2, u2):
+        # x is [kp, z1, u1, z2, u2]
+        ret = self.F_full(self.kpp, self.ell, kp, z1, u1)
+        ret *= self.F_full(self.kpp, self.ell, kp, z2, u2)
+        #ret *= np.exp(1j * self.sinu_arg(x[:, 0], x[:, 1], x[:, 2]))
+        #ret *= np.exp(-1j * self.sinu_arg(x[:, 0], x[:, 3], x[:, 4]))
+        #ret *= np.sin(self.sinu_arg(kp, z1, u1) - self.sinu_arg(kp, z2, u2))
+        return ret
 
-        # Perform CAMB parameter setup according to astropy cosmology.
-        # Setup Nonlinear matter power spectrum interpolator for subsequent calculations. 
-        self.camb_setup()
-        self.PK = mpi(self.CAMBparams, 
-                 zmin=0, 
-                 zmax=11, 
-                 hubble_units=False, 
-                 k_hunit=False) # Here I do not use Hubble units for input or output.
-        
-        # Effective bias from the linear model:
-        b0 = 0.83
-        b1 = 0.742
-        b2 = 0.318
-        self.b_eff = lambda z : b0 + b1*z + b2*z**2
-
-        # Default k_parallel integration variable as 0-1 [Mpc]^{-1}. 
-        self.kp = 0
-
-    def camb_setup(self):
-        self.CAMBparams = camb.model.CAMBparams()
-        H0 = np.array(cosmo._H0)
-        h = cosmo._h # hubble unit
-        ombh2 = np.array(cosmo._Ob0) * h**2 # Baryonic density * h^2
-        omch2 = np.array(cosmo._Odm0) * h**2 # Cold Dark Matter density * h^2
-        self.CAMBparams.set_cosmology(H0=H0, omch2=omch2, ombh2=ombh2, Alens=1.2)
-        print("CAMB setup successful")
-       
-    # Integrand formulations:
-
-    def F(self, k_para, ell, z):
-        chi = np.array(cosmo.comoving_distance(z)) # Comoving distance
-        k = np.sqrt(k_para**2 + ell**2/chi**2) # k = sqrt(kpara^2 + kperp^2)), made dimensionless
-        return self.b_eff(z) * np.sqrt(self.PK.P(z, np.flip(k))) # Units Mpc^(3/2)
-
-    def G(self, l, z):
-        # Resulting shape is (shape(z),shape(l))
-        c = const.c / 1000 # Speed of light in units km/s
-        coef = c / self.l_X / np.array(cosmo.H(self.z_X(l))) * (u.Mpc.to(u.um)) # Units Mpc/um
-        CIB = self.CIBmodel.CIB_model(l, z).T # Units Jy 
-        return coef * CIB / self.chi_p(l) # Units Jy/um, chi_p cancels out the Mpc. 
-
-    def z_X(self, l):
-        # Redshift from which a line with rest wavelength l_X is received at l
-        return l/self.l_X - 1
 
 

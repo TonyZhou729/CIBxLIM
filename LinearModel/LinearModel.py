@@ -34,11 +34,9 @@ class LinearModel():
         self.redshifts = np.loadtxt("{}/SEDredshifts.txt".format(path))
         self.wavelengths = np.loadtxt("{}/SEDwavelengths.txt".format(path))
         self.chi_peaks = np.loadtxt("{}/chi_peaks.txt".format(path))
+        
+        self.interp_SED = interpolate.RectBivariateSpline(self.wavelengths, self.redshifts, self.SED.T)
 
-        self.interp_SED = interpolate.interp2d(self.wavelengths, 
-                                               self.redshifts, 
-                                               self.SED,
-                                               kind="linear")
         self.interp_chi_peaks = interpolate.interp1d(self.wavelengths,
                                                      self.chi_peaks,
                                                      kind="linear")
@@ -50,9 +48,9 @@ class LinearModel():
         denominator = 1+((1+z)/self.gamma)**self.delta
         return self.alpha * numerator/denominator
 
-    # Emissitivity
+    # Emissitivity, output shape should be the same as l and z. 
     def j(self, l, z):
-        res = self.rho_SFR(z) * (1+z) * self.interp_SED(l, z).T * self.chi(z)**2 / self.K
+        res = self.rho_SFR(z) * (1+z) * self.interp_SED(l, z, grid=False) * self.chi(z)**2 / self.K
         return res
 
     def CIB_model(self, l, z):
@@ -81,17 +79,17 @@ class LinearModel():
         for l in wavelengths:
             j_func = self.j(l, z)
             if normal:
-                plt.plot(self.redshifts, j_func/np.trapz(y=j_func, x=z), label="{:.3f} um".format(l))
+                plt.plot(z, j_func/np.trapz(y=j_func, x=z), label="{:.3f} um".format(l))
             else:
-                plt.plot(self.redshifts, j_func, label="{:.3f} um".format(l))
-        plt.yscale("log")
+                plt.plot(z, j_func, label="{:.3f} um".format(l))
+        #plt.yscale("log")
         plt.xlabel("Redshift z")
         plt.ylabel(r"Emissitivity $[\rm Jy L_{\odot}/\rm Mpc]$")
         plt.legend()
         plt.show()
 
-    def plot_CIB_model(self, z, freqs=None, wavelengths=None, freq_unit=u.GHz, wave_unit = u.um, normal=True):
-        # Plot the emissitivity j for given frequncy or array of frequencies.
+    def plot_CIB_model(self, z, freqs=None, wavelengths=None, freq_unit=u.GHz, wave_unit = u.um, normalize=True, logx=False, logy=False):
+        # Plot the CIB intensity for given frequncy or array of frequencies.
         # Default unit is GHz for frequency and micrometer for wavelength. 
         if freqs is None:
             assert wavelengths is not None, "Must input either frequency or wavelengths"
@@ -106,12 +104,16 @@ class LinearModel():
         
         wavelengths = np.array(wavelengths)
         for l in wavelengths:
-            j_func = self.CIB_model(l, z)
-            if normal:
-                plt.plot(self.redshifts, j_func/np.trapz(y=j_func, x=z), label="{:.3f} um".format(l))
+            CIB_func = self.CIB_model(l, z)
+            if normalize:
+                plt.plot(z, CIB_func/np.trapz(y=CIB_func, x=z), label="{:.3f} um".format(l))
             else:
-                plt.plot(self.redshifts, j_func, label="{:.3f} um".format(l))
+                plt.plot(z, CIB_func, label="{:.3f} um".format(l))
+        if logx:
+            plt.xscale("log")
+        if logy:
+            plt.yscale("log")
         plt.xlabel("Redshift z")
-        plt.ylabel(r"$ dI_{\lambda}/dz$")
+        plt.ylabel(r"$\frac{dI_{\lambda}}{dz} [Jy]$")
         plt.legend()
         plt.show()
