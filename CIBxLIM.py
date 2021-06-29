@@ -57,7 +57,7 @@ class CIBxLIM():
         self.z_min = self.CIBmodel.redshifts.min()
         self.z_max = self.CIBmodel.redshifts.max()
         
-        """
+        
         # Perform CAMB parameter setup according to astropy cosmology.
         # Setup Nonlinear matter power spectrum interpolator for subsequent calculations. 
         self.camb_setup()
@@ -66,7 +66,8 @@ class CIBxLIM():
                  zmax=11, 
                  hubble_units=False, 
                  k_hunit=False) # Here I do not use Hubble units for input or output.
-        """ 
+        
+        """
         # Tuple random points P(z, k) interpolator.
         print("Loading and creating P(z, k) interpolator...")
         PK_grid = np.loadtxt("PKdata/k0-40_3500.txt")
@@ -74,6 +75,7 @@ class CIBxLIM():
         z = np.linspace(self.z_min, self.z_max, 3500)
         self.PK_interpolator = interpolate.RectBivariateSpline(z, k, PK_grid)
         print("P(z, k) interpolator successfully created.")
+        """
 
         # Effective bias from the linear model:
         b0 = 0.83
@@ -190,5 +192,13 @@ class CIBxLIM():
         #ret *= np.sin(self.sinu_arg(kp, z1, u1) - self.sinu_arg(kp, z2, u2))
         return ret
 
+### Fourier Analysis ###
+    def fourier_func(l, z, kp, ell):
+        scaling = cosmo.H(z) / (const.c / 1000) / self.chi_p(l)
+        bias = self.b_eff(z)
+        k = np.sqrt(kp**2 + ell**2 / np.array(cosmo.comoving_distance(z))**2) # Spherical k mode.
+        pkz = np.sqrt(self.PK.P(z, k))
+        CIB = self.CIBmodel.CIB_model(l, z)
+        return scaling * bias * pkz * CIB
 
 
