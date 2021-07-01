@@ -7,6 +7,8 @@ import camb
 from camb import get_matter_power_interpolator as mpi
 import vegas
 from scipy import interpolate
+from scipy import integrate
+import matplotlib.pyplot as plt
 
 """
 Unit System:
@@ -57,7 +59,7 @@ class CIBxLIM():
         self.z_min = self.CIBmodel.redshifts.min()
         self.z_max = self.CIBmodel.redshifts.max()
         
-        
+        """
         # Perform CAMB parameter setup according to astropy cosmology.
         # Setup Nonlinear matter power spectrum interpolator for subsequent calculations. 
         self.camb_setup()
@@ -75,13 +77,17 @@ class CIBxLIM():
         z = np.linspace(self.z_min, self.z_max, 3500)
         self.PK_interpolator = interpolate.RectBivariateSpline(z, k, PK_grid)
         print("P(z, k) interpolator successfully created.")
-        """
 
         # Effective bias from the linear model:
         b0 = 0.83
         b1 = 0.742
         b2 = 0.318
         self.b_eff = lambda z : b0 + b1*z + b2*z**2
+
+        # Comoving distance to redshift interpolator
+        x = np.linspace(self.z_min, self.z_max, 1000)
+        y = np.array(cosmo.comoving_distance(x))
+        self.z_from_chi = interpolate.interp1d(y, x)
 
     def camb_setup(self):
         self.CAMBparams = camb.model.CAMBparams()
@@ -192,13 +198,59 @@ class CIBxLIM():
         #ret *= np.sin(self.sinu_arg(kp, z1, u1) - self.sinu_arg(kp, z2, u2))
         return ret
 
-### Fourier Analysis ###
-    def fourier_func(l, z, kp, ell):
-        scaling = cosmo.H(z) / (const.c / 1000) / self.chi_p(l)
-        bias = self.b_eff(z)
+### Fourier Analysis ### 
+    
+    # l, z should be arrays for FFT, kp and ell should be single values (for now).
+    # Output dimension is (dim(l), dim(z))
+    def fourier_integrand(self, l, z, kp, ell):
+        ll, zz = np.meshgrid(l, z)
+        scaling = cosmo.H(zz) / (const.c / 1000) / self.chi_p(ll) # (dim(l), dim(z))
+        bias = self.b_eff(z) # (dim(z),)
         k = np.sqrt(kp**2 + ell**2 / np.array(cosmo.comoving_distance(z))**2) # Spherical k mode.
-        pkz = np.sqrt(self.PK.P(z, k))
-        CIB = self.CIBmodel.CIB_model(l, z)
+        pkz = np.sqrt(self.PK_interpolator(z, k, grid=False))
+        CIB = self.CIBmodel.CIB_model(l, z) # (dim(l), dim(z))
         return scaling * bias * pkz * CIB
+
+    def F_hat(self, kpp, z_arr):
+        chi_X_min = np.array(cosmo.comoving_distance(self.z_X_min))
+        chi_X_max = np.array(cosmo.comoving_distance(self.z_X_max))
+        chi_X_arr = np.linspace(chi_X_min, chi_X_max, 1000) # Evenly spaced comoving distance points.
+        z_X_arr = self.z_from_chi(chi_X_arr) # Convert to redshift, not evenly spaced. 
+        l_arr = (1+z_X_arr) * self.l_X # In micrometers
+        
+        CIB = self.CIBmodel.CIB_model(l_arr, z_arr) # CIB model data grid. Shape is (dim(l), dim(z))
+        chip = self.chi_p(l_arr)
+        func = CIB / chip.reshape((chip.size, 1)) # CIB model / peak comoving distance.
+        
+        func_k = np.fft.fft(func, axis=0) # Apply Fourier transform to l axis.
+        k = np.fft.fftfreq(chi_X_arr.size, d=chi_X_arr[1] - chi_X_arr[0])
+        func_k = func_k[np.where(k>=0), :][0] # We only want part of function at positive k. 
+        k = k[np.where(k>=0)] # Filter out negative k.
+
+        closest_idx = np.argmin(np.abs(k - kpp)) # Index of the k value closest to input kpp.
+        return func_k[closest_idx, :] # Return row of transformed function corresponding to kpp. Shape is (dim(z),)
+
+    def V_tilde(self, kp, kpp, ell, neval=10000):
+        z_arr = np.linspace(self.z_min, self.z_max, neval)
+        F_hat_func = self.F_hat(kpp, z_arr)
+        bias = self.b_eff(z_arr)
+        xp = np.array(cosmo.comoving_distance(z_arr)) # x parallel, comoving distance at CIB redshifts.
+        k_arr = np.sqrt(kp**2 + ell**2 / xp**2) # Spherical k  mode.
+        pkz = np.sqrt(self.PK_interpolator(z_arr, k_arr, grid=False))
+
+        sinu_arg = -1j * kp * xp
+
+        func_total = np.exp(sinu_arg) * bias * pkz * F_hat_func
+
+        return integrate.simps(y=func_total, x=z_arr)
+    
+    def fourier_Cl(self, kpp, ell):
+        kp_arr = np.linspace(0, 0.5, 150) # k parallel to integrate over.
+        V_arr = np.zeros(kp_arr.size, dtype="complex128")
+        for i in range(kp_arr.size):
+            V_arr[i] = self.V_tilde(kp_arr[i], kpp, ell)
+        V_arr_conj = V_arr.conj() # Take conjugate.
+        res = integrate.simps(y=V_arr * V_arr_conj, x=kp_arr) # Integrate V*V, along k parallel. 
+        return res
 
 
