@@ -50,7 +50,7 @@ class LinearModel():
 
     # Emissitivity, output shape should be the same as l and z. 
     def j(self, l, z):
-        res = self.rho_SFR(z) * (1+z) * self.interp_SED(l, z, grid=False) * self.chi(z)**2 / self.K
+        res = self.rho_SFR(z) * (1+z) * self.interp_SED(l, z, grid=True) * self.chi(z)**2 / self.K
         return res
 
     def CIB_model(self, l, z):
@@ -108,7 +108,7 @@ class LinearModel():
             if normalize:
                 plt.plot(z, CIB_func/np.trapz(y=CIB_func, x=z), label="{:.3f} um".format(l))
             else:
-                plt.plot(z, CIB_func, label="{:.3f} um".format(l))
+                plt.plot(z, CIB_func[0], label="{:.3f} um".format(l))
         if logx:
             plt.xscale("log")
         if logy:
