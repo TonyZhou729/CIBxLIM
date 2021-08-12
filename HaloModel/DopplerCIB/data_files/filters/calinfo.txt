@@ -1,0 +1,23 @@
+CCSD3ZF0000100000001NJPL3IF0PDSX00000001 
+PDS_VERSION_ID		       = PDS3
+RECORD_TYPE                    = STREAM 
+SPACECRAFT_NAME                = "INFRARED ASTRONOMICAL SATELLITE"
+INSTRUMENT_NAME                = "FOCAL PLANE ARRAY"
+INSTRUMENT_ID                  = FPA
+OBJECT                         = TEXT 
+  NOTE                         = "Information about the IRAS detector response."
+  PUBLICATION_DATE             = 1994-07-22 
+END_OBJECT                     = TEXT 
+END 
+
+This directory contains for datasets and their PDS labels which describe the 
+detailed optical system transmission, detector spectral response, and overall 
+relative spectral response for each of the 4 IRAS passbands. These bands are 
+centered on 12, 25, 60, and 100 microns.
+
+FILTER1.TAB	- Band 1, 12 micron bandpass
+FILTER2.TAB	- Band 2, 25 micron bandpass
+FILTER3.TAB	- Band 3, 60 micron bandpass
+FILTER4.TAB	- Band 4, 100 micron bandpass
+
+; http://sbn.psi.edu/pds/archive/iraszody/ir_0004/calib/

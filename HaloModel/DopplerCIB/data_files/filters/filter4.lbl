@@ -1,0 +1,59 @@
+CCSD3ZF0000100000001NJPL3IF0PDSX00000001 
+PDS_VERSION_ID                 = PDS3
+/*          File Format and Length                                     */
+RECORD_TYPE                   = FIXED_LENGTH
+RECORD_BYTES                  = 24
+FILE_RECORDS                  = 16 
+DATA_SET_ID                   = "IRAS-D-FPA-6-RDR-V1.0"
+DATA_SET_NAME                 = "IRAS SPECTRAL RESPONSE V1.0"
+PRODUCT_ID                    = "100-MICRON"
+/*           Record Pointer to Major Object                            */
+^TABLE                        = "FILTER4.TAB"
+/*            Description of Object in File                            */
+OBJECT                        = TABLE
+ ROWS                         = 16 
+ ROW_BYTES                    = 24 
+ INTERCHANGE_FORMAT           = ASCII
+ COLUMNS                      = 4 
+ DESCRIPTION                  = "The transmission and response values 
+  given in this table are to energy/wavelength and represent averages 
+  over all of the IRAS detectors of Band 4 (100 microns).  For more information 
+  see Beichman et al. 1988." 
+ OBJECT                       = COLUMN
+  NAME                        = WAVELENGTH 
+  DATA_TYPE                   = REAL 
+  START_BYTE                  = 1
+  BYTES                       = 5 
+  FORMAT                      = "F5.1" 
+  UNIT                        = MICRON
+ END_OBJECT
+ OBJECT                       = COLUMN
+  NAME                        = OPTICS_TRANSMITTANCE
+  DESCRIPTION		      = "The detailed optical system transmission
+  including the telescope optics and focal plane array filter and lens
+  components."
+  DATA_TYPE                   = REAL
+  START_BYTE                  = 7 
+  BYTES                       = 5  
+  FORMAT                      = "F5.3"
+ END_OBJECT
+ OBJECT                       = COLUMN
+  NAME                        = RELATIVE_DETECTOR_RESPONSE
+  DESCRIPTION		      = "Detector sensitivity to incident energy with
+  wavelength, normalized to the peak value."
+  DATA_TYPE                   = REAL 
+  START_BYTE                  = 13 
+  BYTES                       = 4 
+  FORMAT                      = "F4.2" 
+ END_OBJECT
+ OBJECT                       = COLUMN
+  NAME                        = RELATIVE_SYSTEM_RESPONSE
+  DESCRIPTION		      = "Product of the optics transmittance and 
+  relative detector response, normalized to its peak value."
+  DATA_TYPE                   = REAL
+  START_BYTE                  = 18 
+  BYTES                       = 5 
+  FORMAT                      = "F5.3"
+ END_OBJECT
+END_OBJECT                 
+END

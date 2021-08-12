@@ -2,7 +2,8 @@ import numpy as np
 import scipy.constants as const
 from astropy.cosmology import Planck18_arXiv_v2 as cosmo
 import astropy.units as u
-from LinearModel.LinearModel import LinearModel
+#from LinearModel.LinearModel import LinearModel
+from models import LinearModel, HaloModel
 import camb
 from camb import get_matter_power_interpolator as mpi
 import vegas
@@ -36,6 +37,7 @@ class CIBxLIM():
     (boolean) want_function_of_K : True if output Cl is function of k_{\parallel}' at discrete values of ell. Else is function of ell at k_{\parallel}'. Default False 
     """
     def __init__(self,
+                 want_halo_model=False,
                  exp="EXCLAIM",
                  target_line="CII",
                  target_line_rest_wavelength=None,
@@ -57,7 +59,11 @@ class CIBxLIM():
         self.kpp = 0
 
         # Import CIB model. Default use Linear Model from Maniyar 2018
-        self.CIBmodel = LinearModel() 
+        if want_halo_model:
+            self.CIBmodel = HaloModel()
+        else:
+            self.CIBmodel = LinearModel() 
+   
         self.chi_p = lambda l : self.CIBmodel.interp_chi_peaks(l)
         self.z_min = self.CIBmodel.redshifts.min()
         self.z_max = self.CIBmodel.redshifts.max()
