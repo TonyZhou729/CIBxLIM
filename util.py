@@ -11,6 +11,7 @@ from colossus.lss import bias
 import camb
 from camb import get_matter_power_interpolator as mpi
 
+import time
 
 """
 Utility functions for CIBxLIM powerspectra calculations.
@@ -22,6 +23,38 @@ path = "/mount/citadel1/zz1994/codes/CIBxLIM" # Enter full path to CIBxLIM packa
 
 def chi(z):
     return np.array(acosmo.comoving_distance(z))
+
+def fft_wrapper(func, x_arr, axis=-1, shift=False):    
+    t = time.time()
+    k_arr = np.fft.fftfreq(x_arr.size, d=x_arr[1]-x_arr[0])
+    #print(time.time() - t)
+   
+    t = time.time()
+    res = np.fft.fft(func, axis=axis)    
+    #print(time.time() - t)
+
+    # Normalization
+    t = time.time()
+    res *= (x_arr.max() - x_arr.min()) / x_arr.size
+    #print(time.time() - t)
+
+    t = time.time()
+    if shift:
+        k_arr = np.fft.fftshift(k_arr)
+        res = np.fft.fftshift(res, axes=(axis,))
+    #print(time.time() - t)
+    
+    return k_arr, res
+
+def read_CIB_tab():
+    print("Reading tabulated CIB.")
+    subpath = path + "/tabs/FFT_CIB/1000x2000/"
+    xp_arr = np.loadtxt(subpath + "xp_arr.txt")
+    kpp_arr = np.loadtxt(subpath + "kpp_arr.txt")
+    real = np.loadtxt(subpath + "real.txt")
+    imag = np.loadtxt(subpath + "imag.txt")
+    res = real + 1j * imag
+    return kpp_arr, xp_arr, res
 
 def get_camb_mpi(zarr, karr, nonlinear=False):
     # Cosmological parameters setup
