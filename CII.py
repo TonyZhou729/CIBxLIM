@@ -26,7 +26,6 @@ class CII():
         self.I_mean = np.mean(self.Intensity())
         self.b_mean = np.mean(self.bias())
 
-
     def Intensity(self):
         # Constants
         res = (const.c/1000)/4/np.pi/self.nu/np.array(cosmo.H(self.z)) # Units L_sun * Mpc / GHz 
@@ -45,7 +44,7 @@ class CII():
 
     def Luminosity(self):
         # alpha and beta value taken from Leung 2020 (https://arxiv.org/abs/2004.11912)
-        model = "Silva15"
+        model = "Yang21"
         
         if model == "Leung20":
             alpha = 0.66
@@ -59,33 +58,12 @@ class CII():
         elif model == "Schaerer20":
             alpha = 1.02
             beta = 6.90
+        elif model == "Yang21":
+            alpha = 1.26
+            beta = 7.10
 
-        _SFR = util.SFR(self.mh, self.z)
-        #plt.loglog(self.mh, _SFR, label="DopplerCIB")
-
-
-        #_SFR = SFR.SFR(self.mh, self.z)
-        
-        """
-        plt.loglog(self.mh, _SFR, label="Makeshift")
-        plt.title("SFR-Mh")
-        plt.xlabel(r"$M_{\odot}$")
-        plt.ylabel(r"$M_{\odot}/yr$")
-        plt.show()
-        """
-        
-        #idx = np.argmin(abs(self.cibmean.z - 3))
-        #SFR = SFR[:, idx]
+        _SFR = util.SFR(self.mh, self.z)        
         res=10**(alpha*np.log10(_SFR) + beta)
-        
-        """
-        plt.loglog(self.mh, res)
-        plt.title("LCII-Mh")
-        plt.xlabel(r"$M_{\odot}$")
-        plt.ylabel(r"$L_{\odot}$")
-        plt.show()
-        """
-
         return res
 
     def bias(self):        

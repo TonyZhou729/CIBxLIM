@@ -9,10 +9,11 @@ from scipy import interpolate
 import time
 import util
 
-path = "/mount/citadel1/zz1994/codes/CIBxLIM"
+path = "/mount/citadel1/zz1994/codes/CIBxLIM" # Enter CIBxLIM directory here. 
 KC = 1e-10 # Kennicutt Constant
 
 class LinearModel():
+    ### THE LINEAR MODEL IS OBSOLETE ###
     """
     Linear CIB model for the emissitivity j. A good approximation to the total Halo model
     at large scales (Small k) which is mostly what we're interested in. In the future
@@ -21,29 +22,20 @@ class LinearModel():
     See Maniyar 2018 for details.
     """
 
-    def __init__(self):
-        # Comoving distance shorthand in Mpc
-        self.chi = lambda z : np.array(cosmo.comoving_distance(z))
-        # Kennicutt constant in M_sun/yr
-        self.K = 1e-10
-        
+    def __init__(self):        
         # Fitting parameters:
         self.alpha = 0.007
         self.beta = 3.590
         self.gamma = 2.453
         self.delta = 6.578
 
-        path = "/mount/citadel1/zz1994/codes/CIBxLIM/SEDdata"
+        SEDpath = path + "/tabs/SEDdata"
         self.SED = np.loadtxt("{}/SEDtable.txt".format(path))
         self.redshifts = np.loadtxt("{}/SEDredshifts.txt".format(path))
         self.wavelengths = np.loadtxt("{}/SEDwavelengths.txt".format(path))
         self.chi_peaks = np.loadtxt("{}/chi_peaks.txt".format(path))
         
-        self.interp_SED = interpolate.RectBivariateSpline(self.wavelengths, self.redshifts, self.SED.T)
-
-        self.interp_chi_peaks = interpolate.interp1d(self.wavelengths,
-                                                     self.chi_peaks,
-                                                     kind="linear")
+        self.interp_SED = interpolate.RectBivariateSpline(self.wavelengths, self.redshifts, self.SED.T)        
 
     # Star formation density function
     def rho_SFR(self, z):
@@ -54,7 +46,7 @@ class LinearModel():
 
     # Emissitivity, output shape should be the same as l and z. 
     def b_j(self, l, z):
-        res = self.rho_SFR(z) * (1+z) * self.interp_SED(l, z, grid=True) * self.chi(z)**2 / self.K
+        res = self.rho_SFR(z) * (1+z) * self.interp_SED(l, z, grid=True) * util.chi(z)**2 / K
 
         return res
 
@@ -66,24 +58,18 @@ class LinearModel():
         return res
         
 
-
-
 class HaloModel():
     
     def __init__(self):
-        SEDpath = path + "/SEDdata"
+        SEDpath = path + "/tabs/SEDdata"
         self.chi_peaks = np.loadtxt("{}/chi_peaks.txt".format(SEDpath))
         self.SED = np.loadtxt("{}/SEDtable.txt".format(SEDpath))
         self.redshifts = np.loadtxt("{}/SEDredshifts.txt".format(SEDpath))
-        self.wavelengths = np.loadtxt("{}/SEDwavelengths.txt".format(SEDpath))
-        self.interp_chi_peaks = interpolate.interp1d(self.wavelengths,
-                                                     self.chi_peaks,
-                                                     kind="linear")
+        self.wavelengths = np.loadtxt("{}/SEDwavelengths.txt".format(SEDpath))                                                     
         self.interp_SED = interpolate.RectBivariateSpline(self.wavelengths, self.redshifts, self.SED.T)
-        self.fsub = 0.134
+        self.fsub = 0 # Assume simple model with no sub halo. 
         self.hmf = util.get_hmf_interpolator() # dn/dlnM, Inputs are z, mh
         self.bias = util.get_halo_bias_interpolator() # Halo Bias, Inputs are z, mh
-
 
     # Center halo emissitivity
     def djc_dlogM(self, l, mh, z): 
@@ -101,19 +87,41 @@ class HaloModel():
         return res
     
     # Halo Bias x Emissitivity, intergrated over halo masses
-    def b_j(self, l, z):
+    def b_j(self, l, z, di):
         logmh = np.linspace(6, 16, 200)
         mh = 10**logmh
-        djc_dlogM = self.djc_dlogM(l, mh, z)
+        djc_dlogM = self.djc_dlogM(l, mh, z)        
         integrand = self.bias(z, mh).T * djc_dlogM # Shape is (l, mh, z)
+        
+        # Halo Model Derivatives
+        mm, zz = np.meshgrid(mh, z)
+        mm = mm.T
+        zz = zz.T
+        if di == 0: # d/d(eta_max)
+            factor = 1/util.eta_max
+        elif di == 1: # d/d(M_max)            
+            factor = (np.log(mm) - np.log(util.M_max)) / util.M_max / util.sigma(zz)**2            
+        elif di == 2: # d/d(sigma_Mh0)            
+            factor = (np.log(mm) - np.log(util.M_max))**2 / util.sigma(zz)**3
+        elif di == 3: # d/d(tau)            
+            factor = -(np.log(mm) - np.log(util.M_max))**2 / util.sigma(zz)**3
+            idx = np.where((util.z_c - z) < 0) # Replace these with 0, the rest stay constant. 
+            zz[:, idx] = 0
+            factor *= zz
+        else:
+            print("No derivatives needed.")
+            factor = 1 # No derivatives needed.
+        integrand *= factor
         res = simps(integrand, x=logmh, axis=1) # Integrate over mh, shape is (l, z)
         return res
 
     # Input to Cl calculation, b x dI/dz
-    def b_dI_dz(self, l, z):
+    # Optionally specify di = 0, 1, 2, 3, to obtain derivative w.r.t. halo model params.
+    # Parameters are (eta_max, M_max, sigma_Mh0, tau), see util.py for specifics.
+    def b_dI_dz(self, l, z, di=-1):
         c = const.c/1000
         a = 1/(1+z) # Scale factor
-        res = c/cosmo.H(z).value * a * self.b_j(l, z)
+        res = c/cosmo.H(z).value * a * self.b_j(l, z, di)
         return res
 
 

@@ -25,38 +25,43 @@ def chi(z):
     return np.array(acosmo.comoving_distance(z))
 
 def fft_wrapper(func, x_arr, axis=-1, shift=False):    
-    t = time.time()
     k_arr = np.fft.fftfreq(x_arr.size, d=x_arr[1]-x_arr[0])
-    #print(time.time() - t)
-   
-    t = time.time()
     res = np.fft.fft(func, axis=axis)    
-    #print(time.time() - t)
-
+    
     # Normalization
-    t = time.time()
     res *= (x_arr.max() - x_arr.min()) / x_arr.size
-    #print(time.time() - t)
 
-    t = time.time()
     if shift:
         k_arr = np.fft.fftshift(k_arr)
-        res = np.fft.fftshift(res, axes=(axis,))
-    #print(time.time() - t)
-    
+        res = np.fft.fftshift(res, axes=(axis,))    
     return k_arr, res
 
-def read_CIB_tab():
+def read_CIB_tab(FFT = True, di=-1):
     print("Reading tabulated CIB.")
-    subpath = path + "/tabs/FFT_CIB/1000x2000/"
-    xp_arr = np.loadtxt(subpath + "xp_arr.txt")
-    kpp_arr = np.loadtxt(subpath + "kpp_arr.txt")
-    real = np.loadtxt(subpath + "real.txt")
-    imag = np.loadtxt(subpath + "imag.txt")
-    res = real + 1j * imag
-    return kpp_arr, xp_arr, res
+    if FFT:
+        subpath = path + "/tabs/FFT_CIB/1000x2000/"
+        xp_arr = np.loadtxt(subpath + "xp_arr.txt")
+        kpp_arr = np.loadtxt(subpath + "kpp_arr.txt")
+        if di == -1:        
+            real = np.loadtxt(subpath + "real.txt")
+            imag = np.loadtxt(subpath + "imag.txt")
+        else:        
+            real = np.loadtxt(subpath + "real_dp{}.txt".format(di))
+            imag = np.loadtxt(subpath + "imag_dp{}.txt".format(di))
+        res = real + 1j * imag
+        return kpp_arr, xp_arr, res
+    else:
+        subpath = path + "/tabs/Halo_CIB/1000x2000/"
+        xp_arr = np.loadtxt(subpath + "xp_arr.txt")
+        xpp_arr = np.loadtxt(subpath + "xpp_arr.txt")
+        res = np.loadtxt(subpath + "b_dI_dz.txt")
+        return xpp_arr, xp_arr, res
 
-def get_camb_mpi(zarr, karr, nonlinear=False):
+"""
+If log is true, karr should be evenly spaced on log scale, such as by using np.logspace().
+Gird will be log(P) on axes z and log(k)
+"""
+def get_camb_mpi(zarr, karr, nonlinear=False, use_log=False):
     # Cosmological parameters setup
     CAMBparams = camb.model.CAMBparams()
     H0 = np.array(acosmo._H0)
@@ -68,17 +73,22 @@ def get_camb_mpi(zarr, karr, nonlinear=False):
     PK = mpi(CAMBparams, zmin=zarr.min(), zmax=zarr.max(), nonlinear=nonlinear,
              hubble_units=False, k_hunit=False)
 
-
-    grid = PK.P(zarr, karr) # Get tabulated value for power spectrum. 
-    spline_func = interpolate.RectBivariateSpline(zarr, karr, grid)
-    return lambda z, k : spline_func(z, k, grid=False)
+    if use_log:
+        logPK = lambda z, logk : np.log10(PK.P(z, 10**logk))
+        grid = logPK(zarr, np.log10(karr)) # Both arguments are evenly spaced, k and P are log valued.  
+        spline_func = interpolate.RectBivariateSpline(zarr, np.log10(karr), grid)
+        return lambda z, k : 10**spline_func(z, np.log10(k), grid=False)
+    else:
+        grid = PK.P(zarr, karr) # Get tabulated value for power spectrum. 
+        spline_func = interpolate.RectBivariateSpline(zarr, karr, grid)    
+        return lambda z, k : spline_func(z, k, grid=False)    
 
 def hmf(z, mh):
     ccosmo.setCosmology("planck18")
     return mass_function.massFunction(mh, z=z, q_in="M", q_out="dndlnM", mdef="200c", model="tinker08")
 
 def get_hmf_interpolator():
-    subpath = path + "/HMFdata"
+    subpath = path + "/tabs/HMFdata"
     
     # Load axes and data grid
     zarr = np.loadtxt(subpath+"/z.txt")
@@ -98,7 +108,7 @@ def halo_bias(z, mh):
 
 def get_halo_bias_interpolator():
     # Load axes and data grid
-    subpath = path+"/HMFdata"
+    subpath = path + "/tabs/HMFdata"
     
     zarr = np.loadtxt(subpath+"/z.txt")
     mharr = np.loadtxt(subpath+"/mh.txt")
