@@ -69,11 +69,11 @@ class CIBxLIM():
         self.use_FFT_CIB = use_FFT_CIB
         self.use_FFT_CII = use_FFT_CII
 
-        # Create matter power interpolator. 
-        k = np.linspace(1e-5, 10, 10000)
+        # Create matter power interpolator.         
+        k = np.logspace(-6, 0, 1000, base=10)
         z = np.linspace(self.z_min, self.z_max, 2000)
         
-        self.PK_interpolator = util.get_camb_mpi(z, k) # Inputs are z, k
+        self.PK_interpolator = util.get_camb_mpi(z, k, nonlinear=True, use_log=True) # Inputs are z, k
 
         self.b_g = 3 # Constant galaxy bias
 
