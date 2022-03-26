@@ -99,8 +99,8 @@ class HaloModel():
         zz = zz.T
         if di == 0: # d/d(eta_max)
             factor = 1/util.eta_max
-        elif di == 1: # d/d(M_max)            
-            factor = (np.log(mm) - np.log(util.M_max)) / util.M_max / util.sigma(zz)**2            
+        elif di == 1: # d/d(log(M_max))            
+            factor = (np.log(mm) - np.log(util.M_max)) / util.sigma(zz)**2            
         elif di == 2: # d/d(sigma_Mh0)            
             factor = (np.log(mm) - np.log(util.M_max))**2 / util.sigma(zz)**3
         elif di == 3: # d/d(tau)            
@@ -117,7 +117,7 @@ class HaloModel():
 
     # Input to Cl calculation, b x dI/dz
     # Optionally specify di = 0, 1, 2, 3, to obtain derivative w.r.t. halo model params.
-    # Parameters are (eta_max, M_max, sigma_Mh0, tau), see util.py for specifics.
+    # Parameters are (eta_max, log(M_max), sigma_Mh0, tau), see util.py for specifics.
     def b_dI_dz(self, l, z, di=-1):
         c = const.c/1000
         a = 1/(1+z) # Scale factor
