@@ -3,9 +3,6 @@
 Code for computing the Cosmic Infrared Background Powerspectrum coupled with Line Intensity signal. 
 
 ### Dependencies
-- Numpy
-- Matplotlib
-- Astropy (Fits io and Cosmology)
 - Colossus (Halo mass function and Halo Bias) https://bdiemer.bitbucket.io/colossus/index.html
 - halomod (Alternative HMF & Halo Bias) https://github.com/halomod/hmf
 
