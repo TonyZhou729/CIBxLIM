@@ -46,7 +46,7 @@ class Fisher_calculator():
         return np.exp(para+perp).T
 
     def input_cov(self):
-        cross_part = self.Cl_Ig**2
+        cross_part = abs(self.Cl_Ig)**2
         I_part = self.Cl_II + self.P_N / util.chi(self.z_cen)**2 / self.W(self.kp, self.ell) 
         g_part = self.Cl_gg + 1 / util.chi(self.z_cen)**2 / self.n_g        
         return cross_part + I_part * g_part
@@ -57,13 +57,13 @@ class Fisher_calculator():
         input_cov = self.input_cov()        
         for i in range(n):
             for j in range(i, n):
-                integ = self.dCl_dpi[i] * self.dCl_dpi[j] / input_cov
+                integ = (self.dCl_dpi[i] * self.dCl_dpi[j]).real / input_cov
                 integ *= self.ell * 2 * np.pi # Approx d^2_ell as 2π x ell d_ell
                 integ1D = simps(integ, x=self.ell, axis=1)
                 integ2D = simps(integ1D, x=self.kp)
                 res[i, j] = integ2D
                 res[j, i] = res[i, j]
-        res *= self.V_surv / 2 / (2*np.pi)**3
+        res *= self.V_surv / (2*np.pi)**3
         return res
 
 
