@@ -318,7 +318,9 @@ class CIBxLIM():
         _range = kpp_arr.size if over_k else ell_arr.size
         res = np.zeros(_range, dtype="complex128" if complex_out else "float64") # Expecting real result. 
         
-        kp_arr = np.linspace(kp_min, kp_max, steps)
+        #kp_arr = np.linspace(kp_min, kp_max, steps)
+        log_kp_arr = np.linspace(np.log10(kp_min), np.log10(kp_max), steps) # use log interval
+        kp_arr = 10**log_kp_arr
         # Loop through kpp or ell, depending on desired axis.
         for i in tqdm(range(_range)):
             if over_k:
@@ -327,7 +329,7 @@ class CIBxLIM():
             else:
                 ell = ell_arr[i]
                 kpp = kpp_arr
-            integrand = np.zeros(kp_arr.size, dtype="float64")
+            integrand = np.zeros(log_kp_arr.size, dtype="float64")
             mparr = mp.Array("d", integrand) # Multiprocessing array to be shared.         
             plist = []
             for j in range(cores):
@@ -343,9 +345,9 @@ class CIBxLIM():
             for p in plist:
                 p.join()
             if complex_out:
-                res[i] = integrate.simps(np.array(mparr[:]) + 1j * np.array(mparr_imag[:]), x=kp_arr)
+                res[i] = integrate.simps(np.log(10)*kp_arr*(np.array(mparr[:]) + 1j * np.array(mparr_imag[:])), x=log_kp_arr)
             else:
-                res[i] = integrate.simps(np.array(mparr[:]), x=kp_arr)            
+                res[i] = integrate.simps(np.log(10)*kp_arr*np.array(mparr[:]), x=log_kp_arr)            
         return res / util.chi(3)**2 / self.L / 2 / np.pi
 
 
