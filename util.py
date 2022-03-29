@@ -54,7 +54,10 @@ def read_CIB_tab(FFT = True, di=-1):
         subpath = path + "/tabs/Halo_CIB/1000x2000/"
         xp_arr = np.loadtxt(subpath + "xp_arr.txt")
         xpp_arr = np.loadtxt(subpath + "xpp_arr.txt")
-        res = np.loadtxt(subpath + "b_dI_dz.txt")
+        if di == -1:
+            res = np.loadtxt(subpath + "b_dI_dz.txt")
+        else:
+            res = np.loadtxt(subpath + "b_dI_dz_dp{}.txt".format(di))
         return xpp_arr, xp_arr, res
 
 """
@@ -163,11 +166,26 @@ def BAR(M_h, z): # equation (6)
     return res
 
 # Finally, the star formation rate:
-def SFR(M_h, z): # equation(9)
+def SFR(M_h, z, di=-1): # equation(9)
     z_grid, M_h_grid = np.meshgrid(z, M_h)
     res = eta(M_h_grid, z) * BAR(M_h_grid, z)
     # Shape will be (z.size, M_h.size)
-    return res.T
+    if di == 0: # d/d(eta_max)
+        factor = 1/eta_max
+    elif di == 1: # d/d(log(M_max))
+        factor = (np.log10(M_h_grid) - np.log10(M_max)) / sigma(z_grid)**2
+    elif di == 2: # d/d(sigma_Mh0)
+        factor = (np.log10(M_h_grid) - np.log10(M_max))**2 / sigma(z_grid)**3
+    elif di == 3: # d/d(tau)
+        factor = -(np.log10(M_h_grid) - np.log10(M_max))**2 / sigma(z_grid)**3
+        idx_zero = np.where((z_c - z) <= 0) # Replace these with 0, the rest stay constant.
+        z_grid[:, idx_zero] = 0
+        idx_rest = np.where((z_c-z) > 0) # positive values become z_c-z
+        z_grid[:, idx_rest] = z_c - z[idx_rest]
+        factor *= z_grid
+    else: # No derivatives
+        factor = 1
+    return res * factor
 
 # Calculate SFR for subhalo, taking smaller value of equations 9 and 10 in Maniyar 2020
 def SFR_sub(mheff, msub, z):

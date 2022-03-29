@@ -86,7 +86,7 @@ class CIBxLIM():
             if self.use_FFT_CIB:
                 self.kpp_arr, self.xp_arr, self.b_dI_dz = util.read_CIB_tab(self.use_FFT_CIB, self.di)
             else:                
-                xpp_arr, xp_arr, b_dI_dz = util.read_CIB_tab(self.use_FFT_CIB)
+                xpp_arr, xp_arr, b_dI_dz = util.read_CIB_tab(self.use_FFT_CIB, di=self.di)
                 self.b_dI_dz = interpolate.RectBivariateSpline(xpp_arr, xp_arr, b_dI_dz)
         else:            
             # Physical axes for Fourier transform

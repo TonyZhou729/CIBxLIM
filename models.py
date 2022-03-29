@@ -72,13 +72,13 @@ class HaloModel():
         self.bias = util.get_halo_bias_interpolator() # Halo Bias, Inputs are z, mh
 
     # Center halo emissitivity
-    def djc_dlogM(self, l, mh, z): 
+    def djc_dlogM(self, l, mh, z, di=-1): 
         res = np.zeros((l.size, mh.size, z.size), dtype="float64")
         mheff = mh * (1-self.fsub) # Effective central halo mass fraction. 
         hmf_part = self.hmf(z, mh).T # Takes full halo mass, not just the central. Shape is (mh, z)           
         # All parts not involving the wavelength dimension within SED.
         # Equation 12 in Maniyar 2020 without the last S_nu_eff term.
-        rest = hmf_part * util.SFR(mheff, z).T * (1+z) * util.chi(z)**2 / KC # Shape is (l, z)
+        rest = hmf_part * util.SFR(mheff, z, di) * (1+z) * util.chi(z)**2 / KC # Shape is (l, z)
         
         # Loop through wavelengths for SED. 
         SED = self.interp_SED(l, z)
@@ -87,12 +87,12 @@ class HaloModel():
         return res
     
     # Halo Bias x Emissitivity, intergrated over halo masses
-    def b_j(self, l, z, di):
+    def b_j(self, l, z, di=-1):
         logmh = np.linspace(6, 16, 200)
         mh = 10**logmh
-        djc_dlogM = self.djc_dlogM(l, mh, z)        
+        djc_dlogM = self.djc_dlogM(l, mh, z, di)        
         integrand = self.bias(z, mh).T * djc_dlogM # Shape is (l, mh, z)
-        
+        """ 
         # Halo Model Derivatives
         mm, zz = np.meshgrid(mh, z)
         mm = mm.T
@@ -112,6 +112,7 @@ class HaloModel():
             print("No derivatives needed.")
             factor = 1 # No derivatives needed.
         integrand *= factor
+        """
         res = simps(integrand, x=logmh, axis=1) # Integrate over mh, shape is (l, z)
         return res
 

@@ -12,7 +12,7 @@ import util
 # the linear bias.
 
 class CII():
-    def __init__(self, z):
+    def __init__(self, z, di=-1):
         self.z = z # Requested Redshift
         self.nu = const.c/ (158 * 1e-6) / 1e9 # Rest frequnecy of CII, converted from rest wavelength of 158 microns.
         self.mh = np.linspace(1e10, 1e16, 10000)
@@ -23,26 +23,26 @@ class CII():
         self.hmf = hmf_func(self.z, self.mh)
         self.halo_bias = bias_func(self.z, self.mh)
         self.L = self.Luminosity()
-        self.I_mean = np.mean(self.Intensity())
+        self.I_mean = np.mean(self.Intensity(di))
         self.b_mean = np.mean(self.bias())
 
-    def Intensity(self):
+    def Intensity(self, di=-1):
         # Constants
         res = (const.c/1000)/4/np.pi/self.nu/np.array(cosmo.H(self.z)) # Units L_sun * Mpc / GHz 
-        res *= self.rho_L() # Units 1/Mpc^3
+        res *= self.rho_L(di) # Units 1/Mpc^3
         res = res * u.L_sun / u.GHz / u.Mpc**2
         res = res.to(u.Jy)
         res /= u.Jy
         return res
 
-    def rho_L(self):
+    def rho_L(self, di=-1):
         #plt.loglog(self.mh, self.hmf_model.dn_dm())
         #plt.show()
         #integ = self.Luminosity() * self.hmf_model.dn_dm()
-        integ = self.L * self.hmf / self.mh # Last division converts dn/dlnM to dn/dM
+        integ = self.Luminosity(di) * self.hmf / self.mh # Last division converts dn/dlnM to dn/dM
         return integrate.simps(integ, x=self.mh)
 
-    def Luminosity(self):
+    def Luminosity(self, di=-1):
         # alpha and beta value taken from Leung 2020 (https://arxiv.org/abs/2004.11912)
         model = "Yang21"
         
@@ -62,8 +62,12 @@ class CII():
             alpha = 1.26
             beta = 7.10
 
-        _SFR = util.SFR(self.mh, self.z)        
-        res=10**(alpha*np.log10(_SFR) + beta)
+        _SFR = util.SFR(self.mh, self.z, di=-1)        
+        if di == -1:
+            res=10**(alpha*np.log10(_SFR) + beta)
+        else:
+            _dSFR = util.SFR(self.mh, self.z, di)
+            res = alpha * 10**beta * _SFR**(alpha-1) * _dSFR
         return res
 
     def bias(self):        
