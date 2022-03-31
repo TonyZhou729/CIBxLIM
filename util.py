@@ -183,7 +183,7 @@ def SFR(M_h, z, di=-1): # equation(9)
         idx_rest = np.where((z_c-z) > 0) # positive values become z_c-z
         z_grid[:, idx_rest] = z_c - z[idx_rest]
         factor *= z_grid
-    else: # No derivatives
+    else: # No derivatives        
         factor = 1
     return res * factor
 

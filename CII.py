@@ -22,13 +22,14 @@ class CII():
         # Convenient self reference values
         self.hmf = hmf_func(self.z, self.mh)
         self.halo_bias = bias_func(self.z, self.mh)
-        self.L = self.Luminosity()
+        self.L = self.Luminosity(di).T
         self.I_mean = np.mean(self.Intensity(di))
         self.b_mean = np.mean(self.bias())
 
     def Intensity(self, di=-1):
         # Constants
-        res = (const.c/1000)/4/np.pi/self.nu/np.array(cosmo.H(self.z)) # Units L_sun * Mpc / GHz 
+        res = (const.c/1000)/4/np.pi/self.nu/np.array(cosmo.H(self.z)) # Units L_sun * Mpc / GHz    
+        rho_L = self.rho_L(di)        
         res *= self.rho_L(di) # Units 1/Mpc^3
         res = res * u.L_sun / u.GHz / u.Mpc**2
         res = res.to(u.Jy)
@@ -39,7 +40,7 @@ class CII():
         #plt.loglog(self.mh, self.hmf_model.dn_dm())
         #plt.show()
         #integ = self.Luminosity() * self.hmf_model.dn_dm()
-        integ = self.Luminosity(di) * self.hmf / self.mh # Last division converts dn/dlnM to dn/dM
+        integ = self.L * self.hmf / self.mh # Last division converts dn/dlnM to dn/dM
         return integrate.simps(integ, x=self.mh)
 
     def Luminosity(self, di=-1):
