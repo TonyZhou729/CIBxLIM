@@ -88,31 +88,10 @@ class HaloModel():
     
     # Halo Bias x Emissitivity, intergrated over halo masses
     def b_j(self, l, z, di=-1):
-        logmh = np.linspace(6, 16, 200)
+        logmh = np.linspace(10, 18, 3000) # Range will cover all possible derivatives.
         mh = 10**logmh
         djc_dlogM = self.djc_dlogM(l, mh, z, di)        
-        integrand = self.bias(z, mh).T * djc_dlogM # Shape is (l, mh, z)
-        """ 
-        # Halo Model Derivatives
-        mm, zz = np.meshgrid(mh, z)
-        mm = mm.T
-        zz = zz.T
-        if di == 0: # d/d(eta_max)
-            factor = 1/util.eta_max
-        elif di == 1: # d/d(log(M_max))            
-            factor = (np.log(mm) - np.log(util.M_max)) / util.sigma(zz)**2            
-        elif di == 2: # d/d(sigma_Mh0)            
-            factor = (np.log(mm) - np.log(util.M_max))**2 / util.sigma(zz)**3
-        elif di == 3: # d/d(tau)            
-            factor = -(np.log(mm) - np.log(util.M_max))**2 / util.sigma(zz)**3
-            idx = np.where((util.z_c - z) < 0) # Replace these with 0, the rest stay constant. 
-            zz[:, idx] = 0
-            factor *= zz
-        else:
-            print("No derivatives needed.")
-            factor = 1 # No derivatives needed.
-        integrand *= factor
-        """
+        integrand = self.bias(z, mh).T * djc_dlogM # Shape is (l, mh, z)        
         res = simps(integrand, x=logmh, axis=1) # Integrate over mh, shape is (l, z)
         return res
 

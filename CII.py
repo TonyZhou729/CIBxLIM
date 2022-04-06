@@ -18,14 +18,14 @@ class CII():
         self.mh = np.linspace(1e10, 1e16, 10000)
         hmf_func = util.get_hmf_interpolator()
         bias_func = util.get_halo_bias_interpolator()
-        
+
         # Convenient self reference values
         self.hmf = hmf_func(self.z, self.mh)
-        self.halo_bias = bias_func(self.z, self.mh)
-        self.L = self.Luminosity(di).T
-        self.I_mean = np.mean(self.Intensity(di))
-        self.b_mean = np.mean(self.bias())
-
+        self.halo_bias = bias_func(self.z, self.mh)        
+        if di == -1:
+            self.factor = self.Intensity(di) * self.bias(di)
+        else:            
+            self.factor = self.bias(di=-1) * self.Intensity(di=di) - self.Intensity(di=-1) * self.bias(di=di)
     def Intensity(self, di=-1):
         # Constants
         res = (const.c/1000)/4/np.pi/self.nu/np.array(cosmo.H(self.z)) # Units L_sun * Mpc / GHz    
@@ -40,11 +40,10 @@ class CII():
         #plt.loglog(self.mh, self.hmf_model.dn_dm())
         #plt.show()
         #integ = self.Luminosity() * self.hmf_model.dn_dm()
-        integ = self.L * self.hmf / self.mh # Last division converts dn/dlnM to dn/dM
+        integ = self.Luminosity(di=di).T * self.hmf / self.mh # Last division converts dn/dlnM to dn/dM
         return integrate.simps(integ, x=self.mh)
 
     def Luminosity(self, di=-1):
-        # alpha and beta value taken from Leung 2020 (https://arxiv.org/abs/2004.11912)
         model = "Yang21"
         
         if model == "Leung20":
@@ -71,10 +70,19 @@ class CII():
             res = alpha * 10**beta * _SFR**(alpha-1) * _dSFR
         return res
 
-    def bias(self):        
-        integ1 = self.L * self.halo_bias * (self.hmf / self.mh)
-        integ2 = self.L * (self.hmf / self.mh)
-        res = integrate.simps(integ1, x=self.mh) / integrate.simps(integ2, x=self.mh)
+    def bias(self, di):        
+        integ1 = self.Luminosity(di=-1).T * self.halo_bias * (self.hmf / self.mh)
+        integ2 = self.Luminosity(di=-1).T * (self.hmf / self.mh)
+        I1 = integrate.simps(integ1, x=self.mh)
+        I2 = integrate.simps(integ2, x=self.mh)
+        if di == -1:
+            res = I1 / I2
+        else: # Need derivatives            
+            dinteg1 = self.Luminosity(di=di).T * self.halo_bias * (self.hmf / self.mh)
+            dinteg2 = self.Luminosity(di=di).T * (self.hmf / self.mh)
+            dI1 = integrate.simps(dinteg1, x=self.mh)
+            dI2 = integrate.simps(dinteg2, x=self.mh)            
+            res = (I2 * dI1 - I1 * dI2) / I2**2 # Good'ol Quotient rule!
         return res
 
     def plot_bias(self):

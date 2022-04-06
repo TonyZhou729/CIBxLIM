@@ -24,6 +24,18 @@ path = "/mount/citadel1/zz1994/codes/CIBxLIM" # Enter full path to CIBxLIM packa
 def chi(z):
     return np.array(acosmo.comoving_distance(z))
 
+def load_cl(s1, s2, di=-1):
+    subpath = path+"/CIBcls/final/log/"
+    fname = s1+"x"+s2
+    if di != -1:
+        fname += "_dp{}".format(di)
+    if s1 == "CIB" and s2 != "CIB":
+        fr = fname+"_real.txt"
+        fi = fname+"_imag.txt"
+        return np.loadtxt(subpath+fr) + 1j*np.loadtxt(subpath+fi)
+    else:
+        return np.loadtxt(subpath+fname+".txt")
+
 def fft_wrapper(func, x_arr, axis=-1, shift=False):    
     k_arr = np.fft.fftfreq(x_arr.size, d=x_arr[1]-x_arr[0])
     res = np.fft.fft(func, axis=axis)    
@@ -167,8 +179,13 @@ def BAR(M_h, z): # equation (6)
 
 # Finally, the star formation rate:
 def SFR(M_h, z, di=-1): # equation(9)
-    z_grid, M_h_grid = np.meshgrid(z, M_h)
-    res = eta(M_h_grid, z) * BAR(M_h_grid, z)
+    z_grid, M_h_grid = np.meshgrid(z, M_h) # Shape is (M_h, z)
+    #print(z_grid)
+    #print(M_h_grid)
+    #print(z_grid.shape)
+    #print(M_h_grid.shape)
+    res = eta(M_h_grid, z_grid) * BAR(M_h_grid, z_grid)
+    #res = BAR(M_h_grid, z_grid)
     # Shape will be (z.size, M_h.size)
     if di == 0: # d/d(eta_max)
         factor = 1/eta_max
