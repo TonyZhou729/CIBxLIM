@@ -75,7 +75,7 @@ class CIBxLIM():
         
         self.PK_interpolator = util.get_camb_mpi(z, k, nonlinear=True, use_log=True) # Inputs are z, k
 
-        self.b_g = 3 # Constant galaxy bias
+        self.b_g = 3.5 # Constant galaxy bias
 
     """
     Read/Calculate CIB intensity (b(z) x dI/dz(v, z)) once to avoid repetition in window function.

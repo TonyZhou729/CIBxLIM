@@ -12,20 +12,22 @@ import util
 # the linear bias.
 
 class CII():
-    def __init__(self, z, di=-1):
+    def __init__(self, z, di=-1, Lmodel="Yang21"):
         self.z = z # Requested Redshift
         self.nu = const.c/ (158 * 1e-6) / 1e9 # Rest frequnecy of CII, converted from rest wavelength of 158 microns.
         self.mh = np.linspace(1e10, 1e16, 10000)
+        self.Lmodel = Lmodel
         hmf_func = util.get_hmf_interpolator()
         bias_func = util.get_halo_bias_interpolator()
 
         # Convenient self reference values
-        self.hmf = hmf_func(self.z, self.mh)
+        self.hmf = hmf_func(self.z, self.mh) * np.log(10) # Coverts dn/dlnM to dn/dlog10M
         self.halo_bias = bias_func(self.z, self.mh)        
         if di == -1:
             self.factor = self.Intensity(di) * self.bias(di)
         else:            
-            self.factor = self.bias(di=-1) * self.Intensity(di=di) - self.Intensity(di=-1) * self.bias(di=di)
+            #self.factor = self.bias(di=-1) * self.Intensity(di=di) - self.Intensity(di=-1) * self.bias(di=di)
+            self.factor = self.bias(di=-1) * self.Intensity(di=di)
     def Intensity(self, di=-1):
         # Constants
         res = (const.c/1000)/4/np.pi/self.nu/np.array(cosmo.H(self.z)) # Units L_sun * Mpc / GHz    
@@ -40,11 +42,11 @@ class CII():
         #plt.loglog(self.mh, self.hmf_model.dn_dm())
         #plt.show()
         #integ = self.Luminosity() * self.hmf_model.dn_dm()
-        integ = self.Luminosity(di=di).T * self.hmf / self.mh # Last division converts dn/dlnM to dn/dM
+        integ = self.Luminosity(di=di).T * self.hmf / self.mh # Last division converts dn/dlog10M to dn/dM
         return integrate.simps(integ, x=self.mh)
 
     def Luminosity(self, di=-1):
-        model = "Yang21"
+        model = self.Lmodel
         
         if model == "Leung20":
             alpha = 0.66

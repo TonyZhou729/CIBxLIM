@@ -25,7 +25,7 @@ def chi(z):
     return np.array(acosmo.comoving_distance(z))
 
 def load_cl(s1, s2, di=-1):
-    subpath = path+"/CIBcls/final/log/"
+    subpath = path+"/CIBcls/dr3/"
     fname = s1+"x"+s2
     if di != -1:
         fname += "_dp{}".format(di)
@@ -164,7 +164,7 @@ def sigma(z):
     return res
 
 def eta(M_h, z): 
-    expo = -(np.log(M_h)-np.log(M_max))**2/2/(sigma(z)**2)
+    expo = -(np.log10(M_h)-np.log10(M_max))**2/2/(sigma(z)**2)
     res = eta_max*np.exp(expo)
     return res
 

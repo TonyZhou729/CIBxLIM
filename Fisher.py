@@ -18,7 +18,7 @@ class Fisher_calculator():
     Cl_gg : Galaxy auto power spectrum.    
     """
 
-    def __init__(self, dCl_dpi, Cl_Ig, Cl_II, Cl_gg, ell, kp):
+    def __init__(self, dCl_dpi, Cl_Ig, Cl_II, Cl_gg, ell, kp, fsky=0.007, P_N=1.442e11, n_g=3e-6):
         # Needed Power Spectra
         self.dCl_dpi = dCl_dpi
         self.Cl_Ig = Cl_Ig
@@ -28,14 +28,11 @@ class Fisher_calculator():
         self.ell = ell
 
         # Survey Params
-        self.fsky = 0.007
         self.R = 512
         self.theta = 1e-3
-        self.P_N = 4.58e11 # Jy^2/sr^2 x (Mpc/h)^3, intensity noise power spectrum        
-        #self.P_N = 0
-        self.n_g = 3e-6 # (h/Mpc)^3, galaxy number density.
-        #self.n_g = 4.73e-5
-        #self.n_g=100000000
+        self.fsky=fsky
+        self.P_N = P_N # Jy^2/sr^2 x (Mpc/h)^3, intensity noise power spectrum                
+        self.n_g = n_g #* 10# (h/Mpc)^3, galaxy number density.        
         self.z_cen = 3 # Central redshift for survey window
         self.L = util.chi(3.5) - util.chi(2.5)
 
@@ -71,15 +68,40 @@ class Fisher_calculator():
             for j in range(i, n):
                 #integ = 2 * (self.dCl_dpi[i] * self.dCl_dpi[j]).real / input_cov
                 integ = (self.dCl_dpi[i] * self.dCl_dpi[j].conj()) + (self.dCl_dpi[i].conj() * self.dCl_dpi[j])
-                integ = integ.real / input_cov                
+                integ = integ.real / input_cov                                
                 #integ = integ.real * np.linalg.inv(input_cov)
                 #integ = integ.T
                 integ = integ.T * self.ell * 2 * np.pi # Approx d^2_ell as 2π x ell d_ell, shape is now (k, ell)                
                 integ1D = simps(integ, x=self.ell, axis=1)
                 integ2D = simps(integ1D, x=self.kp)
+                #integ2D = simps(np.log(10)*self.kp*integ1D, x=np.log10(self.kp))
                 res[i, j] = integ2D
                 res[j, i] = res[i, j]
-        res *= self.V_surv / (2*np.pi)**3 / 2
+        res *= (self.V_surv / (2*np.pi)**3 / 2)
         return res
+
+    # Computes the parameter constraint bias when CIB is excluded from the signals.
+    def get_bias(self, Fisher, CIBxg):
+        inv = np.linalg.inv(Fisher)
+        
+        # Computation of bias vector
+        n = inv.shape[0]
+        D = np.zeros(n, dtype="complex128")
+        input_cov = self.input_cov()
+        for i in range(n):
+            integ = abs(CIBxg) / self.Cl_Ig # Cl_Ig should just be CIIxg
+            integ = integ * self.dCl_dpi[i]
+            integ = integ.T * self.ell * 2 * np.pi
+            integ = integ.T / input_cov
+            # Integrate in both axes.
+            integ1D = simps(integ, x=self.ell, axis=0)
+            integ2D = simps(integ1D, x=self.kp)
+            D[i] = integ2D
+        D *= (self.V_surv / (2*np.pi)**3)        
+        # Sum over covariance components and bias vector.
+        dpa = np.matmul(inv, D)
+        return dpa
+
+
 
 
