@@ -51,14 +51,6 @@ class Fisher_calculator():
         g_part = self.Cl_gg + 1 / util.chi(self.z_cen)**2 / self.n_g                
         return cross_part + I_part * g_part
 
-    def input_cov2(self):
-        t1 = abs(self.Cl_Ig)**2 
-        t2 = self.Cl_II * self.Cl_gg
-        t3 = self.Cl_II / util.chi(3)**2 / self.n_g
-        t4 = self.Cl_gg * self.P_N / util.chi(3)**2 / self.W(self.ell, self.kp)
-        t5 = self.P_N / util.chi(3)**4 / self.W(self.ell, self.kp) / self.n_g
-        return t1+t2+t3+t4+t5    
-
     def get_Fisher(self):
         n = self.dCl_dpi[:, 0, 0].size # Number of parameters
         #n = 3
@@ -68,13 +60,10 @@ class Fisher_calculator():
             for j in range(i, n):
                 #integ = 2 * (self.dCl_dpi[i] * self.dCl_dpi[j]).real / input_cov
                 integ = (self.dCl_dpi[i] * self.dCl_dpi[j].conj()) + (self.dCl_dpi[i].conj() * self.dCl_dpi[j])
-                integ = integ.real / input_cov                                
-                #integ = integ.real * np.linalg.inv(input_cov)
-                #integ = integ.T
+                integ = integ.real / input_cov                                                
                 integ = integ.T * self.ell * 2 * np.pi # Approx d^2_ell as 2π x ell d_ell, shape is now (k, ell)                
                 integ1D = simps(integ, x=self.ell, axis=1)
-                integ2D = simps(integ1D, x=self.kp)
-                #integ2D = simps(np.log(10)*self.kp*integ1D, x=np.log10(self.kp))
+                integ2D = simps(integ1D, x=self.kp)                
                 res[i, j] = integ2D
                 res[j, i] = res[i, j]
         res *= (self.V_surv / (2*np.pi)**3 / 2)
