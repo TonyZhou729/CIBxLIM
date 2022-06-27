@@ -12,11 +12,12 @@ import util
 # the linear bias.
 
 class CII():
-    def __init__(self, z, di=-1, Lmodel="Yang21"):
+    def __init__(self, z, di=-1, Lmodel="Yang21", params=[0.42, 12.94, 1.75, 1.17, 0, 0]):
         self.z = z # Requested Redshift
         self.nu = const.c/ (158 * 1e-6) / 1e9 # Rest frequnecy of CII, converted from rest wavelength of 158 microns.
         self.mh = np.linspace(1e10, 1e16, 10000)
         self.Lmodel = Lmodel
+        self.params = params
         hmf_func = util.get_hmf_interpolator()
         bias_func = util.get_halo_bias_interpolator()
 
@@ -26,8 +27,8 @@ class CII():
         if di == -1:
             self.factor = self.Intensity(di) * self.bias(di)
         else:            
-            #self.factor = self.bias(di=-1) * self.Intensity(di=di) - self.Intensity(di=-1) * self.bias(di=di)
-            self.factor = self.bias(di=-1) * self.Intensity(di=di)
+            self.factor = self.bias(di=-1) * self.Intensity(di=di) + self.Intensity(di=-1) * self.bias(di=di)
+            #self.factor = self.bias(di=-1) * self.Intensity(di=di)
     def Intensity(self, di=-1):
         # Constants
         res = (const.c/1000)/4/np.pi/self.nu/np.array(cosmo.H(self.z)) # Units L_sun * Mpc / GHz    
@@ -63,13 +64,21 @@ class CII():
         elif model == "Yang21":
             alpha = 1.26
             beta = 7.10
-
-        _SFR = util.SFR(self.mh, self.z, di=-1)        
-        if di == -1:
-            res=10**(alpha*np.log10(_SFR) + beta)
         else:
-            _dSFR = util.SFR(self.mh, self.z, di)
+            alpha = self.params[4]
+            beta = self.params[5]
+        
+        _SFR = util.SFR(self.mh, self.z, di=-1, params=self.params[:4])        
+        if di == -1:
+            #res=10**(alpha*np.log10(_SFR) + beta)
+            res = 10**beta * _SFR**alpha
+        elif di < 4: # Halo SFR parameters.
+            _dSFR = util.SFR(self.mh, self.z, di)            
             res = alpha * 10**beta * _SFR**(alpha-1) * _dSFR
+        elif di == 4: # Power law parameter alpha.
+            res = 10**beta * _SFR**alpha * np.log(_SFR)
+        else: # Power law parameter beta.
+            res = 10**beta * _SFR**alpha * np.log(10)
         return res
 
     def bias(self, di):        
