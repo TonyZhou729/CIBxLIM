@@ -152,8 +152,9 @@ def sigma(z, sigma_Mh0, tau):
     res[idx] -= tau * (z_c - z[idx])
     return res
 
-def eta(M_h, z, eta_max, logM_max, sigma_Mh0, tau): 
-    expo = -(np.log10(M_h)-logM_max)**2/2/(sigma(z, sigma_Mh0, tau)**2)
+def eta(M_h, z, eta_max=0.42, log10M_max=12.94, sigma_Mh0=1.75, tau=1.17):     
+    lnM_max = np.log(10**log10M_max)
+    expo = -(np.log(M_h)-lnM_max)**2/2/(sigma(z, sigma_Mh0, tau)**2)                    
     res = eta_max*np.exp(expo)
     return res
 
@@ -164,7 +165,7 @@ def M_dot(M_h, z): # equation (7)
     return res
 
 def BAR(M_h, z): # equation (6)
-    res = M_dot(M_h, z) * acosmo.Ob(z)/acosmo.Om(z) 
+    res = M_dot(M_h, z) * acosmo.Ob(z)/acosmo.Om(z)     
     return res
 
 """
@@ -190,20 +191,22 @@ SFR at given best fit parameter values or analytical derivative. 2D array of sha
 def SFR(M_h, z, di=-1, params=[0.42, 12.94, 1.75, 1.17]): # equation(9)
     z_grid, M_h_grid = np.meshgrid(z, M_h) # Shape is (M_h, z)
     eta_max = params[0]
-    logM_max = params[1]
+    log10M_max = params[1]
     sigma_Mh0 = params[2]
     tau = params[3]
     
-    res = eta(M_h_grid, z_grid, eta_max, logM_max, sigma_Mh0, tau) * BAR(M_h_grid, z_grid)    
+    res = eta(M_h_grid, z_grid, eta_max, log10M_max, sigma_Mh0, tau) * BAR(M_h_grid, z_grid)        
+    lnM_max = np.log(10**log10M_max)
+        
     # Shape will be (z.size, M_h.size)
     if di == 0: # d/d(eta_max)
         factor = 1/eta_max
-    elif di == 1: # d/d(log(M_max))
-        factor = (np.log10(M_h_grid) - logM_max) / sigma(z_grid, sigma_Mh0, tau)**2
+    elif di == 1: # d/d(log(M_max)
+        factor = (np.log(M_h_grid) - lnM_max) / sigma(z_grid, sigma_Mh0, tau)**2 * np.log(10)
     elif di == 2: # d/d(sigma_Mh0)
-        factor = (np.log10(M_h_grid) - logM_max)**2 / sigma(z_grid, sigma_Mh0, tau)**3
+        factor = (np.log(M_h_grid) - lnM_max)**2 / sigma(z_grid, sigma_Mh0, tau)**3
     elif di == 3: # d/d(tau)
-        factor = -(np.log10(M_h_grid) - logM_max)**2 / sigma(z_grid, sigma_Mh0, tau)**3
+        factor = -(np.log(M_h_grid) - lnM_max)**2 / sigma(z_grid, sigma_Mh0, tau)**3
         idx_zero = np.where((z_c - z) <= 0) # Replace these with 0, the rest stay constant.
         z_grid[:, idx_zero] = 0
         idx_rest = np.where((z_c-z) > 0) # positive values become z_c-z

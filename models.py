@@ -68,7 +68,7 @@ class HaloModel():
         self.wavelengths = np.loadtxt("{}/SEDwavelengths.txt".format(SEDpath))                                                     
         self.interp_SED = interpolate.RectBivariateSpline(self.wavelengths, self.redshifts, self.SED.T)
         self.fsub = 0 # Assume simple model with no sub halo. 
-        self.hmf = util.get_hmf_interpolator() # dn/dlnM, Inputs are z, mh
+        self.hmf = util.get_hmf_interpolator() * np.log(10) # dn/dlog10M, Inputs are z, mh
         self.bias = util.get_halo_bias_interpolator() # Halo Bias, Inputs are z, mh
 
     # Center halo emissitivity
