@@ -39,7 +39,7 @@ def load_cl(s1, s2, di=-1):
 def read_CIB_tab(FFT = True, di=-1):
     print("Reading tabulated CIB.")
     if FFT:
-        subpath = path + "/tabs/FFT_CIB/1000x2000/"
+        subpath = path + "/tabs/FFT_CIB/july_5_2022/"
         xp_arr = np.loadtxt(subpath + "xp_arr.txt")
         kpp_arr = np.loadtxt(subpath + "kpp_arr.txt")
         if di == -1:        
@@ -51,7 +51,7 @@ def read_CIB_tab(FFT = True, di=-1):
         res = real + 1j * imag
         return kpp_arr, xp_arr, res
     else:
-        subpath = path + "/tabs/Halo_CIB/1000x2000/"
+        subpath = path + "/tabs/Halo_CIB/july_5_2022/"
         xp_arr = np.loadtxt(subpath + "xp_arr.txt")
         xpp_arr = np.loadtxt(subpath + "xpp_arr.txt")
         if di == -1:

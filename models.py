@@ -68,14 +68,14 @@ class HaloModel():
         self.wavelengths = np.loadtxt("{}/SEDwavelengths.txt".format(SEDpath))                                                     
         self.interp_SED = interpolate.RectBivariateSpline(self.wavelengths, self.redshifts, self.SED.T)
         self.fsub = 0 # Assume simple model with no sub halo. 
-        self.hmf = util.get_hmf_interpolator() * np.log(10) # dn/dlog10M, Inputs are z, mh
+        self.hmf = util.get_hmf_interpolator() # dn/dlnM, Inputs are z, mh
         self.bias = util.get_halo_bias_interpolator() # Halo Bias, Inputs are z, mh
 
     # Center halo emissitivity
     def djc_dlogM(self, l, mh, z, di=-1): 
         res = np.zeros((l.size, mh.size, z.size), dtype="float64")
         mheff = mh * (1-self.fsub) # Effective central halo mass fraction. 
-        hmf_part = self.hmf(z, mh).T # Takes full halo mass, not just the central. Shape is (mh, z)           
+        hmf_part = self.hmf(z, mh).T * np.log(10) # Takes full halo mass, not just the central. Shape is (mh, z). ln(10) corrects to dn/dlog10M           
         # All parts not involving the wavelength dimension within SED.
         # Equation 12 in Maniyar 2020 without the last S_nu_eff term.
         rest = hmf_part * util.SFR(mheff, z, di) * (1+z) * util.chi(z)**2 / KC # Shape is (l, z)
